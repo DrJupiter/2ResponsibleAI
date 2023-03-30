@@ -13,28 +13,29 @@ import torch.nn.functional as functional
 from torch.utils.data import Dataset, DataLoader
 from skimage import io
 import matplotlib.pyplot as plt
-import requests
 from PIL import Image
+import glob
 
 # %%
 
 from torchvision.models import vgg16
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-## Initialize pre-trained VGG
-model = vgg16(pretrained=True)
+def get_model():
 
-## Freeze layers
-for param in model.parameters():
-    param.requires_grad = False
+    ## Initialize pre-trained VGG
+    model = vgg16(pretrained=True)
 
-## Get GPU 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-## Send to GPU
-model.to(device)
-print(f"Model is on {device}")
+    ## Freeze layers
+    for param in model.parameters():
+        param.requires_grad = False
 
-## Open the image
-img = Image.open('white_pelican.jpg')
+    ## Get GPU 
+    
+    ## Send to GPU
+    model.to(DEVICE)
+    print(f"Model is on {DEVICE}")
+    return model
 
 ## Transforms
 def format(image, size=224):
@@ -47,49 +48,58 @@ def format(image, size=224):
 def view(image):
     return transforms.ToPILImage()(image)
 
-## Prepare image
-image = format(img)
+def prepare_image(img):
+    ## Prepare image
+    image = format(img)
 
-# fix weird 4th channel with only 255 values...
-if image.size(1) > 3:
-  image = image[:, :3, :, :]
-print(image.size())
-#view(image.squeeze(0))
+    # fix weird 4th channel with only 255 values...
+    if image.size(1) > 3:
+      image = image[:, :3, :, :]
+    #print(image.size())
+    #view(image.squeeze(0))
 
-image = Variable(image, requires_grad=True)
+    image = Variable(image, requires_grad=True)
+    return image
 
-## Forward pass
-model.eval()
-scores = model(image.to(device)) #TODO [forward pass the image through our model]
+## Open the image
 
-## Get scores
-class_index = scores.argmax()#TODO [get index of the highest score]
-class_score = max(scores[0]) #TODO [get highest score
+def saliency(model, image):
+    model.eval()
 
-## Backpropagate score
-#TODO [backpropagate class score]
-class_score.backward()
 
-## Get saliency of image (hint: grad.data)
-saliency, _ = torch.max(image.grad.data.abs(),dim=1)
-#TODO [compute saliency]
+    scores = model(image.to(DEVICE)) #TODO [forward pass the image through our model]
 
-## Visualize input image and saliency map
+    ## Get scores
+    class_index = scores.argmax()#TODO [get index of the highest score]
+    class_score = max(scores[0]) #TODO [get highest score
 
-fig = plt.figure(figsize=(16,8))
-ax1 = fig.add_subplot(121)
-ax2 = fig.add_subplot(122)
+    ## Backpropagate score
+    #TODO [backpropagate class score]
+    class_score.backward()
 
-# Show input image
-ax1.imshow(view(image[0]))
-ax1.axis('off')
+    ## Get saliency of image (hint: grad.data)
+    saliency, _ = torch.max(image.grad.data.abs(),dim=1)
+    return saliency, class_index
 
-# Show saliency map
-ax2.imshow(saliency[0], cmap=plt.cm.hot)
-ax2.axis('off')
+def plot_saliency(image, saliency, class_index=None):
+    ## Visualize input image and saliency map
 
-# Print predicted class
-print('Predicted Class: ' + str(class_index))
+    fig = plt.figure(figsize=(16,8))
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+
+    # Show input image
+    ax1.imshow(view(image[0]))
+    ax1.axis('off')
+
+    # Show saliency map
+    ax2.imshow(saliency[0], cmap=plt.cm.hot)
+    ax2.axis('off')
+    if class_index is not None:
+    # Print predicted class
+        print('Predicted Class: ' + str(class_index))
+    
+    plt.show()
 
 ## Gradient Attack Class
 
@@ -104,58 +114,107 @@ class GradientAttack():
             x = torch.clamp(x + torch.sign(x.grad) * self.epsilon, 0, 1)
             return x
 
-loss_metric = nn.CrossEntropyLoss()
-adv_attack = GradientAttack(loss_metric, 0.01)
 
-labels = model(image.cuda()).argmax(dim=1)
-image_cln = Variable(image.cuda(), requires_grad=True)
-image_adv = adv_attack.forward(image_cln, labels, model)
-image_adv.retain_grad()
+def get_adverserial(epsilon=0.01):
+    loss_metric = nn.CrossEntropyLoss()
+    adv_attack = GradientAttack(loss_metric, epsilon)
+    return adv_attack
+
+def adverserial_attack(model, image, adv_attack):
 
 
-print("original img:\n", image.size())
-print("adv img:\n", image_adv.size())
+    labels = model(image.cuda()).argmax(dim=1)
+    image_cln = Variable(image.cuda(), requires_grad=True)
+    image_adv = adv_attack.forward(image_cln, labels, model)
+    image_adv.retain_grad()
 
-## Show adversarial comparison with original
-fig = plt.figure(figsize=(16,8))
-ax1 = fig.add_subplot(121)
-ax2 = fig.add_subplot(122)
 
-# Show original image
-ax1.imshow(view(image_cln[0]))
-ax1.axis('off')
-ax1.set_title('Original Class: ' + str(model(image_cln[[0]]).argmax(dim=1)[0]));
+    print("original img:\n", image.size())
+    print("adv img:\n", image_adv.size())
 
-# Show adversarial image
-ax2.imshow(view(image_adv[0]))
-ax2.axis('off')
-ax2.set_title('Predicted Class: ' + str(model(image_adv[[0]]).argmax(dim=1)[0]));
+    ## Show adversarial comparison with original
+    fig = plt.figure(figsize=(16,8))
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
 
-#TODO [make a saliency map of the adversarial image]
+    # Show original image
+    ax1.imshow(view(image_cln[0]))
+    ax1.axis('off')
+    ax1.set_title('Original Class: ' + str(model(image_cln[[0]]).argmax(dim=1)[0]));
 
-model.eval()
-scores_adv = model(image_adv)##  TODO: [Forward pass]
+    # Show adversarial image
+    ax2.imshow(view(image_adv[0]))
+    ax2.axis('off')
+    ax2.set_title('Predicted Class: ' + str(model(image_adv[[0]]).argmax(dim=1)[0]));
+    plt.show()
 
-## TODO: [Get scores]
-class_index_adv = scores_adv.argmax()
-class_score_adv = max(scores_adv[0])
+    #TODO [make a saliency map of the adversarial image]
 
-## TODO: [Backpropagate score]
-class_score_adv.backward()
-saliency_adv = torch.max(image_adv.grad.data.abs(),dim=1)
+    model.eval()
+    scores_adv = model(image_adv)##  TODO: [Forward pass]
 
-## Visualize saliency map of original image and adversarial image
+    ## TODO: [Get scores]
+    class_index_adv = scores_adv.argmax()
+    class_score_adv = max(scores_adv[0])
 
-fig = plt.figure(figsize=(16,8))
-ax1 = fig.add_subplot(121)
-ax2 = fig.add_subplot(122)
+    ## TODO: [Backpropagate score]
+    class_score_adv.backward()
+    saliency_adv = torch.max(image_adv.grad.data.abs(),dim=1)
 
-# Show saliency map of original image
-ax1.imshow(saliency[0], cmap=plt.cm.hot)
-ax1.axis('off')
-ax1.set_title('Original Image');
+    ## Visualize saliency map of original image and adversarial image
 
-# Show saliency map of adversarial image
-ax2.imshow(saliency_adv[0].squeeze(0).cpu().numpy(), cmap=plt.cm.hot)
-ax2.axis('off')
-ax2.set_title('Adversarial Image');
+    fig = plt.figure(figsize=(16,8))
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+
+    # Show saliency map of original image
+    ax1.imshow(saliency[0], cmap=plt.cm.hot)
+    ax1.axis('off')
+    ax1.set_title('Original Image');
+
+    # Show saliency map of adversarial image
+    ax2.imshow(saliency_adv[0].squeeze(0).cpu().numpy(), cmap=plt.cm.hot)
+    ax2.axis('off')
+    ax2.set_title('Adversarial Image');
+    plt.show()
+
+
+
+def path_to_images(path):
+    images = glob.glob(path)
+    processed_images = [] 
+    for image in images:
+        processed_images.append(prepare_image(Image.open(image)))
+    
+    return processed_images
+
+def images_to_saliency(images, model, saliency):
+
+    saliencies = []
+    classes = []
+    for image in images:
+        s, c = saliency(model, image)
+        saliencies.append(s)
+        classes.append(c)
+    
+    return saliencies, classes
+
+def saliences_to_rgb(saliences):
+    rgb = [None]*len(saliences)
+    for i in range(len(saliences)):
+        rgb[i] = torch.vstack([saliences[i]]*3)
+    return rgb
+
+def main(path):
+    images = path_to_images(path)
+    model = get_model()
+    saliencies, classes = images_to_saliency(images, model, saliency)
+    plot_saliency(images[0], saliencies[0], classes[0])
+    print(saliencies[0].shape)
+    from fid import FID_score
+    saliencies_3 = saliences_to_rgb(saliencies)
+    FID_score(saliencies_3[:len(saliencies)//2], saliencies_3[len(saliencies)//2:])
+
+if __name__ == "__main__":
+    path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
+    main(path) 
