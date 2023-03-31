@@ -63,6 +63,21 @@ def prepare_image(img):
 
 ## Open the image
 
+def saliency_smooth(model, image, n=10):
+
+    s = 0
+    classes = []
+    for i in range(n): 
+        with torch.no_grad():
+            noise = torch.normal(mean=torch.zeros_like(image), std=torch.ones_like(image)*1/1000)
+        x = image+noise
+        x = Variable(x, requires_grad=True)
+        m, c = saliency(model, x)
+        s += m
+        classes.append(c)
+    
+    return s/n, classes
+
 def saliency(model, image):
     model.eval()
 
@@ -205,15 +220,18 @@ def saliences_to_rgb(saliences):
         rgb[i] = torch.vstack([saliences[i]]*3)
     return rgb
 
+
+
 def main(path):
-    images = path_to_images(path)
     model = get_model()
-    saliencies, classes = images_to_saliency(images, model, saliency)
-    plot_saliency(images[0], saliencies[0], classes[0])
-    print(saliencies[0].shape)
-    from fid import FID_score
-    saliencies_3 = saliences_to_rgb(saliencies)
-    FID_score(saliencies_3[:len(saliencies)//2], saliencies_3[len(saliencies)//2:])
+    for s_map in [saliency, saliency_smooth]:
+        images = path_to_images(path)
+        saliencies, classes = images_to_saliency(images, model, s_map)
+        plot_saliency(images[0], saliencies[0], classes[0])
+        print(saliencies[0].shape)
+        from fid import FID_score
+        saliencies_3 = saliences_to_rgb(saliencies)
+        FID_score(saliencies_3[:len(saliencies)//2], saliencies_3[len(saliencies)//2:])
 
 if __name__ == "__main__":
     path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
