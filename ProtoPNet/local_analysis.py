@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
-
 import re
 
 import os
@@ -24,36 +23,34 @@ from preprocess import mean, std, preprocess_input_function, undo_preprocess_inp
 
 import argparse
 
+os.chdir(os.getcwd() + '/ProtoPNet') # change dir to repo
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-gpuid', nargs=1, type=str, default='0')
-parser.add_argument('-modeldir', nargs=1, type=str)
-parser.add_argument('-model', nargs=1, type=str)
-parser.add_argument('-imgdir', nargs=1, type=str)
-parser.add_argument('-img', nargs=1, type=str)
-parser.add_argument('-imgclass', nargs=1, type=int, default=-1)
+# parser.add_argument('-modeldir', nargs=1, type=str, default='/home/soberanis/code/Interpretable/Explaining_Prototypes/saved_models/vgg19/003')
+# parser.add_argument('-modeldir', nargs=1, type=str, default='')
+parser.add_argument('-modeldir', nargs=1, type=str, default='/saved_models/vgg19/003')
+parser.add_argument('-model', nargs=1, type=str, default='150_17push0.2724.pth')
+# parser.add_argument('-imgdir', nargs=1, type=str, default='/home/soberanis/code/Interpretable/Explaining_Prototypes/local_analysis/img_test/')
+parser.add_argument('-imgdir', nargs=1, type=str, default='local_analysis/img_test')
+parser.add_argument('-img', nargs=1, type=str, default='Painted_Bunting_0004_16641.JPEG')
+parser.add_argument('-imgclass', nargs=1, type=int, default=15)
 args = parser.parse_args()
-
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpuid[0]
 
 # specify the test image to be analyzed
-test_image_dir = args.imgdir[0] #'./local_analysis/Painted_Bunting_Class15_0081/'
-test_image_name = args.img[0] #'Painted_Bunting_0081_15230.jpg'
-test_image_label = args.imgclass[0] #15
+test_image_dir = args.imgdir #'./local_analysis/Painted_Bunting_Class15_0081/'
+test_image_name = args.img #'Painted_Bunting_0081_15230.jpg'
+test_image_label = args.imgclass #15
 
-test_image_path = os.path.join(test_image_dir, test_image_name)
+test_image_path = os.getcwd() + f'/{test_image_dir}/{test_image_name}'
 
 # load the model
 check_test_accu = False
 
-load_model_dir = args.modeldir[0] #'./saved_models/vgg19/003/'
-load_model_name = args.model[0] #'10_18push0.7822.pth'
-
-#if load_model_dir[-1] == '/':
-#    model_base_architecture = load_model_dir.split('/')[-3]
-#    experiment_run = load_model_dir.split('/')[-2]
-#else:
-#    model_base_architecture = load_model_dir.split('/')[-2]
-#    experiment_run = load_model_dir.split('/')[-1]
+load_model_dir = args.modeldir #'./saved_models/vgg19/003/'
+load_model_name = args.model #'10_18push0.7822.pth'
 
 model_base_architecture = load_model_dir.split('/')[2]
 experiment_run = '/'.join(load_model_dir.split('/')[3:])
@@ -63,8 +60,7 @@ save_analysis_path = os.path.join(test_image_dir, model_base_architecture,
 makedir(save_analysis_path)
 
 log, logclose = create_logger(log_filename=os.path.join(save_analysis_path, 'local_analysis.log'))
-
-load_model_path = os.path.join(load_model_dir, load_model_name)
+load_model_path = os.getcwd() + f'/{load_model_dir}' + f'/{load_model_name}'
 epoch_number_str = re.search(r'\d+', load_model_name).group(0)
 start_epoch_number = int(epoch_number_str)
 
@@ -72,8 +68,9 @@ log('load model from ' + load_model_path)
 log('model base architecture: ' + model_base_architecture)
 log('experiment run: ' + experiment_run)
 
-ppnet = torch.load(load_model_path)
-ppnet = ppnet.cuda()
+
+ppnet = torch.load(load_model_path, map_location=device)
+ppnet = ppnet.to(device)
 ppnet_multi = torch.nn.DataParallel(ppnet)
 
 img_size = ppnet_multi.module.img_size
@@ -107,9 +104,10 @@ if check_test_accu:
 
 ##### SANITY CHECK
 # confirm prototype class identity
-load_img_dir = os.path.join(load_model_dir, 'img')
+print("CWDDD", os.getcwd())
+load_img_dir = load_model_dir + '/img'
 
-prototype_info = np.load(os.path.join(load_img_dir, 'epoch-'+epoch_number_str, 'bb'+epoch_number_str+'.npy'))
+prototype_info = np.load(os.getcwd() +f'{load_img_dir}' + '/epoch-'+epoch_number_str + '/bb'+epoch_number_str+'.npy')
 prototype_img_identity = prototype_info[:, -1]
 
 log('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
@@ -136,20 +134,19 @@ def save_preprocessed_img(fname, preprocessed_imgs, index=0):
     return undo_preprocessed_img
 
 def save_prototype(fname, epoch, index):
-    p_img = plt.imread(os.path.join(load_img_dir, 'epoch-'+str(epoch), 'prototype-img'+str(index)+'.png'))
+    p_img = plt.imread(os.getcwd() + load_img_dir + '/epoch-'+str(epoch) + '/prototype-img'+str(index)+'.png')
     #plt.axis('off')
     plt.imsave(fname, p_img)
     
 def save_prototype_self_activation(fname, epoch, index):
-    p_img = plt.imread(os.path.join(load_img_dir, 'epoch-'+str(epoch),
-                                    'prototype-img-original_with_self_act'+str(index)+'.png'))
+    p_img = plt.imread(os.getcwd() + load_img_dir + '/epoch-'+str(epoch) + '/prototype-img-original_with_self_act'+str(index)+'.png')
     #plt.axis('off')
     plt.imsave(fname, p_img)
 
 def save_prototype_original_img_with_bbox(fname, epoch, index,
                                           bbox_height_start, bbox_height_end,
                                           bbox_width_start, bbox_width_end, color=(0, 255, 255)):
-    p_img_bgr = cv2.imread(os.path.join(load_img_dir, 'epoch-'+str(epoch), 'prototype-img-original'+str(index)+'.png'))
+    p_img_bgr = cv2.imread(os.getcwd() + load_img_dir + '/epoch-'+str(epoch) + '/prototype-img-original'+str(index)+'.png')
     cv2.rectangle(p_img_bgr, (bbox_width_start, bbox_height_start), (bbox_width_end-1, bbox_height_end-1),
                   color, thickness=2)
     p_img_rgb = p_img_bgr[...,::-1]
@@ -180,7 +177,7 @@ img_pil = Image.open(test_image_path)
 img_tensor = preprocess(img_pil)
 img_variable = Variable(img_tensor.unsqueeze(0))
 
-images_test = img_variable.cuda()
+images_test = img_variable.to(device)
 labels_test = torch.tensor([test_image_label])
 
 logits, min_distances = ppnet_multi(images_test)

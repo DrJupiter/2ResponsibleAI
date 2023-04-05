@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+ProtoPNet/local_analysis*
+protoenv*
+ProtoPNet/datasets*
+ProtoPNet/saved_models*
+
 # Distribution / packaging
 .Python
 build/
