@@ -235,7 +235,7 @@ def saliences_to_rgb(saliences):
 
 from torchmetrics.image.fid import FrechetInceptionDistance
 
-def main(path, n = 1, only_saliency = False):
+def main(path, n = 100, only_saliency = False):
     model = get_model()
     fid = FrechetInceptionDistance(feature=2048, device=DEVICE)
     fid.inception.cuda()
@@ -265,5 +265,6 @@ def main(path, n = 1, only_saliency = False):
         """
 
 if __name__ == "__main__":
-    path = './bird_imgs/*'
+    #path = './bird_imgs/*'
+    path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
     main(path, only_saliency = False) 
