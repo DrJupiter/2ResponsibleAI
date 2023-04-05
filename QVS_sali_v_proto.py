@@ -1,6 +1,6 @@
 #%%
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # Load file with receptive field / patch in it
 prototype_info = np.load("./npy_files/bb150.npy")
@@ -17,20 +17,30 @@ bbox_width_end=prototype_info[img_index][4]
 img = np.array(Image.open("./saliency_imgs/saliency_tst_img.png"))
 
 # Convert to [0,1] and flip black to be 0 and white 1, and also remove last channel if there are 4.
-img = -(img[:,:,:3]/255)+1
+# img = -(img[:,:,:3]/255)+1
+img = img[:,:,:3]
+
 
 # get total activation
-total_activation = np.sum(img)
+total_activation = np.sum(-1*img/255+1)
 
 # apply patch to saliency
 patch_img = img[bbox_height_start:bbox_height_end,bbox_width_start:bbox_width_end]
 
 # get activation after patch
-patch_activation = np.sum(patch_img)
+patch_activation = np.sum(-1*patch_img/255+1)
 
 # find relative activation
 activation = patch_activation/total_activation
 
 # print stuff
 print(activation)
-Image.fromarray(np.round(-(patch_img*255)+1,0).astype(np.uint8)) # convert back and display
+Image.fromarray(np.round(patch_img,0).astype(np.uint8)) # convert back and display
+# Image.fromarray(np.round(-(patch_img*255)+1,0).astype(np.uint8)) # convert back and display
+
+
+imgage = Image.fromarray(img)
+img_draw = ImageDraw.Draw(imgage)
+shape = [(bbox_width_start,bbox_height_start),(bbox_width_end,bbox_height_end)]
+img_draw.rectangle(shape, outline ="red")
+imgage
