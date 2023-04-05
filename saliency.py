@@ -233,27 +233,35 @@ def saliences_to_rgb(saliences):
         rgb[i] = torch.vstack([saliences[i]]*3)
     return rgb
 
-from torchmetrics.image.fid import FrechetInceptionDistance
+# from torchmetrics.image.fid import FrechetInceptionDistance
 
 def main(path, n = 100, only_saliency = False):
     model = get_model()
-    fid = FrechetInceptionDistance(feature=2048, device=DEVICE)
-    fid.inception.cuda()
+    # fid = FrechetInceptionDistance(feature=2048, device=DEVICE)
+    # fid.inception.cuda()
+    i=0
     for s_map in [saliency, saliency_smooth]:
         images = path_to_images(path)
         saliencies, classes = images_to_saliency(images, model, s_map)
         saliencies_3 = saliences_to_rgb(saliencies)
-        saliencies_3 = (torch.vstack([torch.unsqueeze(s, 0) for s in saliencies_3])*255).type(torch.uint8).cuda()
+        saliencies_3 = (torch.vstack([torch.unsqueeze(s, 0) for s in saliencies_3])*255).type(torch.uint8) #.cuda()
         permutations = [np.random.permutation(len(saliencies_3)) for i in range(n)]
-        plot_saliency(images[0], saliencies[0], classes[0])
+        plot_saliency(images[0], saliencies[0], classes[0], only_saliency=only_saliency)
         #print(saliencies[0].shape)
         avg_fid = 0
-        for indices in permutations:
-            fid.update(saliencies_3[indices[len(indices)//2:]], real=True)
-            fid.update(saliencies_3[indices[:len(indices)//2]], real=False)
-            avg_fid += fid.compute()
-            fid.reset()
+        # for indices in permutations:
+        #     fid.update(saliencies_3[indices[len(indices)//2:]], real=True)
+        #     fid.update(saliencies_3[indices[:len(indices)//2]], real=False)
+        #     avg_fid += fid.compute()
+        #     fid.reset()
         print(avg_fid/n)
+        if only_saliency:
+            i += 1
+
+            saliency_imgs = saliencies_3.permute(0,2,3,1)
+            for img_i in range(saliency_imgs.size(0)):
+                Image.fromarray(np.array(saliency_imgs[img_i])).save(f"./saliency_imgs/saliency_{i}.png")
+
         """
         break
         from fid import FID_score

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw
 import cv2
 from torchvision import transforms
 import matplotlib.pyplot as plt
@@ -27,7 +27,7 @@ def undo_preprocess(preprocessed_imgs, index=0):
     return undo_preprocessed_img
 
 
-def run_analysis(img_path, test_image_label):
+def run_analysis(img_path, test_image_label, saliency_path=None):
     CFG = cfg()
     prototype_info = np.load(os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy')
     prototype_img_identity = prototype_info[:, -1]
@@ -81,6 +81,11 @@ def run_analysis(img_path, test_image_label):
 
     original_img = undo_preprocess(images_test, idx)
     
+    if saliency_path is not None:
+        saliency_img = np.array(Image.open(saliency_path))
+        max_sali = np.max(saliency_img)
+        activations = []
+
     array_act, sorted_indices_act = torch.sort(prototype_activations[idx])
     patches, boxes = [], []
     for i in range(1,11):
@@ -96,6 +101,25 @@ def run_analysis(img_path, test_image_label):
         
         patches.append(high_act_patch)
         boxes.append(high_act_patch_indices)
+
+        if saliency_path is not None:
+            full_saliency_activation = np.sum(-1*saliency_img/max_sali+1)
+            high_act_patch_saliency = saliency_img[high_act_patch_indices[0]:high_act_patch_indices[1],
+                            high_act_patch_indices[2]:high_act_patch_indices[3], :]
+            patch_saliency_activation = np.sum(-1*saliency_img/max_sali+1)
+            activation = patch_saliency_activation/full_saliency_activation
+            activations.append(activation)
+
+            sail_draw = Image.fromarray(saliency_img)
+            img_draw = ImageDraw.Draw(sail_draw)
+            shape = [(high_act_patch_indices[2],high_act_patch_indices[0]),(high_act_patch_indices[3],high_act_patch_indices[1])]
+            img_draw.rectangle(shape, outline ="red")
+            sail_draw.save(f"./birds_with_squares/bird_patch_{i}_act_{activation}.jpg")
+
+    with open('GFG', 'w') as f:
+        # using csv.writer method from CSV package
+        write = csv.writer(f)
+        write.writerow(activations)
       
     return high_act_patch_indices, high_act_patch
 
@@ -113,8 +137,7 @@ def compare_with_saliency_maps(patches, boxes, saliency_map):
     return np.mean(FIDS)
 
 
-
 if __name__ == '__main__':
     img_path = 'ProtoPNet/local_analysis/img_test/Painted_Bunting_0004_16641.JPEG'
     img_class = 15
-    main(img_path, img_class)
+    run_analysis(img_path, img_class, saliency_path = None)
