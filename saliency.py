@@ -102,20 +102,27 @@ def saliency(model, image):
     saliency, _ = torch.max(image.grad.data.abs(),dim=1)
     return saliency, class_index
 
-def plot_saliency(image, saliency, class_index=None):
+def plot_saliency(image, saliency, class_index=None, only_saliency = False):
     ## Visualize input image and saliency map
 
-    fig = plt.figure(figsize=(16,8))
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122)
+    if only_saliency:
+        fig = plt.figure(figsize=(8,8))
+        ax1 = fig.add_subplot(111)
+        ax1.imshow(view(saliency[0]))
+        ax1.axis('off')
+    else:
+        fig = plt.figure(figsize=(16,8))
+        ax1 = fig.add_subplot(121)
+        ax2 = fig.add_subplot(122)
 
-    # Show input image
-    ax1.imshow(view(image[0]))
-    ax1.axis('off')
+        # Show input image
+        ax1.imshow(view(image[0]))
+        ax1.axis('off')
 
-    # Show saliency map
-    ax2.imshow(saliency[0], cmap=plt.cm.hot)
-    ax2.axis('off')
+        # Show saliency map
+        ax2.imshow(saliency[0], cmap=plt.cm.hot)
+        ax2.axis('off')
+
     if class_index is not None:
     # Print predicted class
         print('Predicted Class: ' + str(class_index))
@@ -226,15 +233,24 @@ def saliences_to_rgb(saliences):
         rgb[i] = torch.vstack([saliences[i]]*3)
     return rgb
 
+<<<<<<< Updated upstream
 from torchmetrics.image.fid import FrechetInceptionDistance
 
 def main(path, n = 1):
+=======
+def main(path, only_saliency = False):
+>>>>>>> Stashed changes
     model = get_model()
     for s_map in [saliency, saliency_smooth]:
         images = path_to_images(path)
         saliencies, classes = images_to_saliency(images, model, s_map)
+<<<<<<< Updated upstream
         #plot_saliency(images[0], saliencies[0], classes[0])
         #print(saliencies[0].shape)
+=======
+        plot_saliency(images[0], saliencies[0], classes[0], only_saliency = only_saliency)
+        print(saliencies[0].shape)
+>>>>>>> Stashed changes
         from fid import FID_score
         saliencies_3 = saliences_to_rgb(saliencies)
         permutations = [np.random.permutation(len(saliencies_3)) for i in range(n)]
@@ -245,5 +261,5 @@ def main(path, n = 1):
         fid = fid/n
         print(fid)
 if __name__ == "__main__":
-    path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
-    main(path) 
+    path = './bird_imgs/*'
+    main(path, only_saliency = True) 
