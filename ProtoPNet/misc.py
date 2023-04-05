@@ -5,16 +5,17 @@ from PIL import Image
 import cv2
 from torchvision import transforms
 import matplotlib.pyplot as plt
-from ProtoPNet.preprocess import mean, std, preprocess_input_function, undo_preprocess_input_function
-from ProtoPNet.helpers import find_high_activation_crop
+from preprocess import mean, std, preprocess_input_function, undo_preprocess_input_function
+from helpers import find_high_activation_crop
 import copy
-from fid import FID_score
 
+CWD = os.getcwd()
 class cfg:
     def __init__(self):
-        self.prototype_info_path = os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy'
+        self.prototype_info_path = os.getcwd() + '\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model_path = 'ProtoPNet/saved_models/vgg19/003/150_17push0.2724.pth'
+        self.load_model_path = os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\150_17push0.2724.pth'
+        #self.load_model_path = os.getcwd() + '\\saved_models/vgg19/003/150_17push0.2724.pth'
 
 def undo_preprocess(preprocessed_imgs, index=0):
     img_copy = copy.deepcopy(preprocessed_imgs[index:index+1])
@@ -35,7 +36,7 @@ def run_analysis(img_path, test_image_label):
     ppnet = torch.load(CFG.load_model_path, map_location=CFG.device)
     ppnet = ppnet.to(CFG.device)
     ppnet_multi = torch.nn.DataParallel(ppnet)
-
+    
     print('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
     print('Their class identities are: ' + str(prototype_img_identity))
     print(f"There are a total of N: {len(prototype_img_identity)}")
@@ -97,24 +98,29 @@ def run_analysis(img_path, test_image_label):
         patches.append(high_act_patch)
         boxes.append(high_act_patch_indices)
       
-    return high_act_patch_indices, high_act_patch
+    return patches, boxes
 
 
+def compare_with_saliency_maps(boxes, saliency_map):
 
-def compare_with_saliency_maps(patches, boxes, saliency_map):
-
-    N = len(patches)
-    FIDS = []
-    for i in range(N):
-        saliency_patch = saliency_map[boxes[i][0] : boxes[i][1], 
-                                    boxes[i][2] : boxes[i][3], :]
-        FIDS.append(FID_score(patches[i], saliency_patch))
+    N = len(boxes)
+    activations = []
     
-    return np.mean(FIDS)
+    for i in range(N):
+        total_act = sum(saliency_map)
+        saliency_patch = saliency_map[boxes[i][0] : boxes[i][1], 
+                                    boxes[i][2] : boxes[i][3], :] 
+        
+        act = sum(saliency_map/total_act)
+        activations.append(act)
 
+    return activations
 
 
 if __name__ == '__main__':
-    img_path = 'ProtoPNet/local_analysis/img_test/Painted_Bunting_0004_16641.JPEG'
+    img_path = 'ProtoPNet/local_analysis/img_test/Indigo_Bunting_CUB.jpg'
     img_class = 15
-    main(img_path, img_class)
+    saliency_map = Image.load(...)
+    patches, boxes = run_analysis(img_path, img_class)
+    acts = compare_with_saliency_maps(boxes, saliency_map)
+
