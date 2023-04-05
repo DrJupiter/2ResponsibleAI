@@ -228,22 +228,35 @@ def saliences_to_rgb(saliences):
 
 from torchmetrics.image.fid import FrechetInceptionDistance
 
-def main(path, n = 1):
+def main(path, n = 10):
     model = get_model()
+    fid = FrechetInceptionDistance(feature=2048, device=DEVICE)
+    fid.inception.cuda()
     for s_map in [saliency, saliency_smooth]:
         images = path_to_images(path)
         saliencies, classes = images_to_saliency(images, model, s_map)
-        #plot_saliency(images[0], saliencies[0], classes[0])
-        #print(saliencies[0].shape)
-        from fid import FID_score
         saliencies_3 = saliences_to_rgb(saliencies)
+        saliencies_3 = (torch.vstack([torch.unsqueeze(s, 0) for s in saliencies_3])*255).type(torch.uint8).cuda()
         permutations = [np.random.permutation(len(saliencies_3)) for i in range(n)]
+        plot_saliency(images[0], saliencies[0], classes[0])
+        #print(saliencies[0].shape)
+        avg_fid = 0
+        for indices in permutations:
+            fid.update(saliencies_3[indices[len(indices)//2:]], real=True)
+            fid.update(saliencies_3[indices[:len(indices)//2]], real=False)
+            avg_fid += fid.compute()
+            fid.reset()
+        print(avg_fid/n)
+        """
+        break
+        from fid import FID_score
         print(FID_score(saliencies_3, saliencies_3))
         fid = 0
         for indices in permutations:
             fid += FID_score([saliencies_3[i] for i in indices[:len(indices)//2]], [saliencies_3[i] for i in indices[len(indices)//2:]])
         fid = fid/n
-        print(fid)
+        """
+
 if __name__ == "__main__":
     path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
     main(path) 
