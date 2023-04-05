@@ -7,16 +7,14 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 from ProtoPNet.preprocess import mean, std, preprocess_input_function, undo_preprocess_input_function
 from ProtoPNet.helpers import find_high_activation_crop
-import copy 
+import copy
+from fid import FID_score
+
 class cfg:
     def __init__(self):
         self.prototype_info_path = os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_path = 'ProtoPNet/saved_models/vgg19/003/150_17push0.2724.pth'
-
-
-img_path = 'ProtoPNet/local_analysis/img_test/Painted_Bunting_0004_16641.JPEG'
-
 
 def undo_preprocess(preprocessed_imgs, index=0):
     img_copy = copy.deepcopy(preprocessed_imgs[index:index+1])
@@ -29,7 +27,7 @@ def undo_preprocess(preprocessed_imgs, index=0):
     return undo_preprocessed_img
 
 
-def main(img_path, test_image_label):
+def run_analysis(img_path, test_image_label):
     CFG = cfg()
     prototype_info = np.load(os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy')
     prototype_img_identity = prototype_info[:, -1]
@@ -74,7 +72,7 @@ def main(img_path, test_image_label):
 
     for i in range(logits.size(0)):
         tables.append((torch.argmax(logits, dim=1)[i].item(), labels_test[i].item()))
-    +
+    
     idx = 0
     predicted_cls = tables[idx][0]
     correct_cls = tables[idx][1]
@@ -84,6 +82,7 @@ def main(img_path, test_image_label):
     original_img = undo_preprocess(images_test, idx)
     
     array_act, sorted_indices_act = torch.sort(prototype_activations[idx])
+    patches, boxes = [], []
     for i in range(1,11):
         activation_pattern = prototype_activation_patterns[idx][sorted_indices_act[-i].item()].detach().cpu().numpy()
         upsampled_activation_pattern = cv2.resize(activation_pattern, dsize=(img_size, img_size),
@@ -95,10 +94,27 @@ def main(img_path, test_image_label):
         high_act_patch = original_img[high_act_patch_indices[0]:high_act_patch_indices[1],
                                     high_act_patch_indices[2]:high_act_patch_indices[3], :]
         
-        
-        
+        patches.append(high_act_patch)
+        boxes.append(high_act_patch_indices)
+      
+    return high_act_patch_indices, high_act_patch
+
+
+
+def compare_with_saliency_maps(patches, boxes, saliency_map):
+
+    N = len(patches)
+    FIDS = []
+    for i in range(N):
+        saliency_patch = saliency_map[boxes[i][0] : boxes[i][1], 
+                                    boxes[i][2] : boxes[i][3], :]
+        FIDS.append(FID_score(patches[i], saliency_patch))
+    
+    return np.mean(FIDS)
 
 
 
 if __name__ == '__main__':
-    main()
+    img_path = 'ProtoPNet/local_analysis/img_test/Painted_Bunting_0004_16641.JPEG'
+    img_class = 15
+    main(img_path, img_class)

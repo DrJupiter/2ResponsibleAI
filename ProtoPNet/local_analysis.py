@@ -23,6 +23,13 @@ from preprocess import mean, std, preprocess_input_function, undo_preprocess_inp
 
 import argparse
 
+"""
+Images and classes (0-199):
+ - Dark eyed junco: 75
+ - Indigo Bunting: 13
+ - While pelican: 100
+"""
+
 os.chdir(os.getcwd() + '/ProtoPNet') # change dir to repo
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -34,8 +41,8 @@ parser.add_argument('-modeldir', nargs=1, type=str, default='/saved_models/vgg19
 parser.add_argument('-model', nargs=1, type=str, default='150_17push0.2724.pth')
 # parser.add_argument('-imgdir', nargs=1, type=str, default='/home/soberanis/code/Interpretable/Explaining_Prototypes/local_analysis/img_test/')
 parser.add_argument('-imgdir', nargs=1, type=str, default='local_analysis/img_test')
-parser.add_argument('-img', nargs=1, type=str, default='Painted_Bunting_0004_16641.JPEG')
-parser.add_argument('-imgclass', nargs=1, type=int, default=15)
+parser.add_argument('-img', nargs=1, type=str, default='Indigo_Bunting_CUB.jpg')
+parser.add_argument('-imgclass', nargs=1, type=int, default=13)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpuid[0]
 
