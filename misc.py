@@ -106,7 +106,7 @@ def run_analysis(img_path, test_image_label, saliency_path=None):
             full_saliency_activation = np.sum(-1*saliency_img/max_sali+1)
             high_act_patch_saliency = saliency_img[high_act_patch_indices[0]:high_act_patch_indices[1],
                             high_act_patch_indices[2]:high_act_patch_indices[3], :]
-            patch_saliency_activation = np.sum(-1*saliency_img/max_sali+1)
+            patch_saliency_activation = np.mean(-1*saliency_img/max_sali+1)
             activation = patch_saliency_activation/full_saliency_activation
             activations.append(activation)
 
@@ -115,11 +115,6 @@ def run_analysis(img_path, test_image_label, saliency_path=None):
             shape = [(high_act_patch_indices[2],high_act_patch_indices[0]),(high_act_patch_indices[3],high_act_patch_indices[1])]
             img_draw.rectangle(shape, outline ="red")
             sail_draw.save(f"./birds_with_squares/bird_patch_{i}_act_{activation}.jpg")
-
-    with open('GFG', 'w') as f:
-        # using csv.writer method from CSV package
-        write = csv.writer(f)
-        write.writerow(activations)
       
     return high_act_patch_indices, high_act_patch
 

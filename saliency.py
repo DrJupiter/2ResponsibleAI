@@ -275,4 +275,4 @@ def main(path, n = 100, only_saliency = False):
 if __name__ == "__main__":
     #path = './bird_imgs/*'
     path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
-    main(path, only_saliency = None) 
+    main(path, only_saliency = False) 
