@@ -15,11 +15,17 @@ from skimage import io
 import matplotlib.pyplot as plt
 from PIL import Image
 import glob
+import random
 
 # %%
+SEED = 0
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+random.seed(SEED)
 
 from torchvision.models import vgg16
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 def get_model():
 
@@ -220,19 +226,24 @@ def saliences_to_rgb(saliences):
         rgb[i] = torch.vstack([saliences[i]]*3)
     return rgb
 
+from torchmetrics.image.fid import FrechetInceptionDistance
 
-
-def main(path):
+def main(path, n = 1):
     model = get_model()
     for s_map in [saliency, saliency_smooth]:
         images = path_to_images(path)
         saliencies, classes = images_to_saliency(images, model, s_map)
-        plot_saliency(images[0], saliencies[0], classes[0])
-        print(saliencies[0].shape)
+        #plot_saliency(images[0], saliencies[0], classes[0])
+        #print(saliencies[0].shape)
         from fid import FID_score
         saliencies_3 = saliences_to_rgb(saliencies)
-        FID_score(saliencies_3[:len(saliencies)//2], saliencies_3[len(saliencies)//2:])
-
+        permutations = [np.random.permutation(len(saliencies_3)) for i in range(n)]
+        print(FID_score(saliencies_3, saliencies_3))
+        fid = 0
+        for indices in permutations:
+            fid += FID_score([saliencies_3[i] for i in indices[:len(indices)//2]], [saliencies_3[i] for i in indices[len(indices)//2:]])
+        fid = fid/n
+        print(fid)
 if __name__ == "__main__":
     path = '/media/extra/Respsonible/CUB_200_2011/images/001.Black_footed_Albatross/*'
     main(path) 

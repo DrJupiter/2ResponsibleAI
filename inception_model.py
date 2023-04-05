@@ -30,7 +30,7 @@ def inceptionv3(x = None,path_to_imgs = None, pre_transformed = False) -> torch.
         Else input from x (images of shape [N,3,D1,D2]) where N and D1 and D2 can be whatever.\\
     """
 
-    model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', pretrained=True)
+    model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', pretrained=True, verbose=False)
     model.fc = Identity()
     model.eval()
     
@@ -75,6 +75,7 @@ def inceptionv3(x = None,path_to_imgs = None, pre_transformed = False) -> torch.
     if torch.cuda.is_available():
         input = input.to('cuda')
         model.to('cuda')
+        model.eval()
 
     # start2 = perf_counter()
     with torch.no_grad():

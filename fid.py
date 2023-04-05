@@ -21,12 +21,11 @@ def FID_score(x1, x2):
     mu2 = out2.mean(dim=0)
     sigma2 = out2.cov(correction=0)
 
-    print("mu dims",mu1.shape,mu2.shape)
+    #print("mu dims",mu1.shape,mu2.shape)
 
     def gaussian_FID(mu1,mu2,sigma1,sigma2):
         m1mm2 = (mu1-mu2).unsqueeze(0)
         mu_dist = torch.mm(m1mm2,torch.transpose(m1mm2,0,1))
-        print(mu_dist)
 
         sigma = sigma1+sigma2-2*(torch.sqrt(sigma1 @ sigma2))
         trace = torch.trace(sigma)
