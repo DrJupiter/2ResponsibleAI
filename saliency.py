@@ -233,24 +233,15 @@ def saliences_to_rgb(saliences):
         rgb[i] = torch.vstack([saliences[i]]*3)
     return rgb
 
-<<<<<<< Updated upstream
 from torchmetrics.image.fid import FrechetInceptionDistance
 
-def main(path, n = 1):
-=======
-def main(path, only_saliency = False):
->>>>>>> Stashed changes
+def main(path, n = 1, only_saliency = False):
     model = get_model()
     for s_map in [saliency, saliency_smooth]:
         images = path_to_images(path)
         saliencies, classes = images_to_saliency(images, model, s_map)
-<<<<<<< Updated upstream
         #plot_saliency(images[0], saliencies[0], classes[0])
         #print(saliencies[0].shape)
-=======
-        plot_saliency(images[0], saliencies[0], classes[0], only_saliency = only_saliency)
-        print(saliencies[0].shape)
->>>>>>> Stashed changes
         from fid import FID_score
         saliencies_3 = saliences_to_rgb(saliencies)
         permutations = [np.random.permutation(len(saliencies_3)) for i in range(n)]
@@ -262,4 +253,4 @@ def main(path, only_saliency = False):
         print(fid)
 if __name__ == "__main__":
     path = './bird_imgs/*'
-    main(path, only_saliency = True) 
+    main(path, only_saliency = False) 
