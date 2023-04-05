@@ -12,10 +12,9 @@ import copy
 CWD = os.getcwd()
 class cfg:
     def __init__(self):
-        self.prototype_info_path = os.getcwd() + '\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy'
+        self.prototype_info_path = "./npy_files/bb150.npy"# os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.load_model_path = os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\150_17push0.2724.pth'
-        #self.load_model_path = os.getcwd() + '\\saved_models/vgg19/003/150_17push0.2724.pth'
+        self.load_model_path = "./150_17push0.2724.pth"#'ProtoPNet/saved_models/vgg19/003/150_17push0.2724.pth'
 
 def undo_preprocess(preprocessed_imgs, index=0):
     img_copy = copy.deepcopy(preprocessed_imgs[index:index+1])
@@ -30,7 +29,7 @@ def undo_preprocess(preprocessed_imgs, index=0):
 
 def run_analysis(img_path, test_image_label, saliency_path=None):
     CFG = cfg()
-    prototype_info = np.load(os.getcwd() + '\\ProtoPNet\\saved_models\\vgg19\\003\\img\\epoch-150\\bb150.npy')
+    prototype_info = np.load("./npy_files/bb150.npy")
     prototype_img_identity = prototype_info[:, -1]
     #### load model
     ppnet = torch.load(CFG.load_model_path, map_location=CFG.device)
@@ -82,10 +81,10 @@ def run_analysis(img_path, test_image_label, saliency_path=None):
 
     original_img = undo_preprocess(images_test, idx)
     
-    if saliency_path is not None:
-        saliency_img = np.array(Image.open(saliency_path))
-        max_sali = np.max(saliency_img)
-        activations = []
+    # if saliency_path is not None:
+    #     saliency_img = np.array(Image.open(saliency_path))
+    #     max_sali = np.max(saliency_img)
+    #     activations = []
 
     array_act, sorted_indices_act = torch.sort(prototype_activations[idx])
     patches, boxes = [], []
@@ -103,42 +102,58 @@ def run_analysis(img_path, test_image_label, saliency_path=None):
         patches.append(high_act_patch)
         boxes.append(high_act_patch_indices)
 
-        if saliency_path is not None:
-            full_saliency_activation = np.sum(-1*saliency_img/max_sali+1)
-            high_act_patch_saliency = saliency_img[high_act_patch_indices[0]:high_act_patch_indices[1],
-                            high_act_patch_indices[2]:high_act_patch_indices[3], :]
-            patch_saliency_activation = np.mean(-1*saliency_img/max_sali+1)
-            activation = patch_saliency_activation/full_saliency_activation
-            activations.append(activation)
 
-            sail_draw = Image.fromarray(saliency_img)
-            img_draw = ImageDraw.Draw(sail_draw)
-            shape = [(high_act_patch_indices[2],high_act_patch_indices[0]),(high_act_patch_indices[3],high_act_patch_indices[1])]
-            img_draw.rectangle(shape, outline ="red")
-            sail_draw.save(f"./birds_with_squares/bird_patch_{i}_act_{activation}.jpg")
-      
     return patches, boxes
 
 
-def compare_with_saliency_maps(boxes, saliency_map):
-
+def compare_with_saliency_maps(boxes, saliency_img):
     N = len(boxes)
+    top_N = min(N,3)
     activations = []
+    activation_means = []
+
+    max_sali = np.max(saliency_img)
     
-    for i in range(N):
-        total_act = sum(saliency_map)
-        saliency_patch = saliency_map[boxes[i][0] : boxes[i][1], 
-                                    boxes[i][2] : boxes[i][3], :] 
+    for i in range(top_N):
+        # total_act = np.sum(saliency_map)
+        # saliency_patch = saliency_map[boxes[i][0] : boxes[i][1], 
+        #                             boxes[i][2] : boxes[i][3], :] 
         
-        act = sum(saliency_map/total_act)
-        activations.append(act)
+        # act = np.sum(saliency_map/total_act)
+        # activations.append(act)
+        full_saliency_activation = np.sum(saliency_img/max_sali)
+        high_act_patch_saliency = saliency_img[boxes[i][0]:boxes[i][1],
+                        boxes[i][2]:boxes[i][3], :]
+        patch_saliency_activation = np.sum(high_act_patch_saliency/max_sali)
+        patch_saliency_activation_mean = np.mean(high_act_patch_saliency/max_sali)
+        # Image.fromarray(np.array((1*high_act_patch_saliency/max_sali+1)*max_sali,dtype=np.uint8)).show()
+        activation = patch_saliency_activation/full_saliency_activation*100
+        activation_mean = patch_saliency_activation_mean/np.mean(saliency_img/max_sali)
+
+        activations.append(activation)
+        activation_means.append(activation_mean)
+
+        sail_draw = Image.fromarray(saliency_img)
+        img_draw = ImageDraw.Draw(sail_draw)
+        shape = [(boxes[i][2],boxes[i][0]),(boxes[i][3],boxes[i][1])]
+        img_draw.rectangle(shape, outline ="red")
+        sail_draw.save(f"./birds_with_squares/bird_pelican_{i}_act_{activation}.jpg")
+
+    print("% Activations:\n",activations)
+    print("\n% Activation means within patch compared to mean in entire saliency map:\n", activation_means)
+
 
     return activations
 
 if __name__ == '__main__':
-    img_path = 'ProtoPNet/local_analysis/img_test/Indigo_Bunting_CUB.jpg'
+    # img_path = './bird_imgs/Dark_Eyed_Junco_CUB.jpg'
+    # saliency_path = "./saliency_imgs/saliency_dark_eyed.png"
+    # img_path = './bird_imgs/Indigo_Bunting_CUB.jpg'
+    # saliency_path = "./saliency_imgs/saliency_indigo_bunting.png"
+    img_path = './bird_imgs/White_Pelican_CUB.jpg'
+    saliency_path = "./saliency_imgs/saliency_pelican.png"
     img_class = 15
-    saliency_map = Image.load(...)
+    saliency_map = np.array(Image.open(saliency_path))
     patches, boxes = run_analysis(img_path, img_class)
     acts = compare_with_saliency_maps(boxes, saliency_map)
 
